@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My Film Shelf</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root{
+    --bg:#f3f5f8; --surface:#ffffff; --surface2:#e9edf3; --line:#d5dbe5;
+    --text:#161b26; --muted:#5d687b; --accent:#0e8f7e; --accent-ink:#ffffff; --shadow:0 1px 2px rgba(20,30,50,.08);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#10141c; --surface:#181e29; --surface2:#222a38; --line:#2c3547;
+      --text:#e9e7e2; --muted:#98a3b6; --accent:#46c4b0; --accent-ink:#06211c; --shadow:0 1px 2px rgba(0,0,0,.4);
+    }
+  }
+  html{color-scheme:light dark}
+  body{background:var(--bg);color:var(--text);font-family:'Instrument Sans',system-ui,sans-serif}
+  .display{font-family:'Bricolage Grotesque','Instrument Sans',system-ui,sans-serif;letter-spacing:-.02em}
+  .muted{color:var(--muted)}
+  .field{background:var(--surface);border:1px solid var(--line);color:var(--text);border-radius:.75rem}
+  .field:focus{outline:2px solid var(--accent);outline-offset:1px}
+  .chip{background:var(--surface2);color:var(--text);border-radius:999px;padding:.1rem .6rem;font-size:.72rem;white-space:nowrap}
+  .chip.accent{background:var(--accent);color:var(--accent-ink);font-weight:600}
+  .btn{background:var(--accent);color:var(--accent-ink);border-radius:.6rem;font-weight:600;padding:.5rem .9rem;display:inline-block;font-size:.85rem}
+  .btn:hover{filter:brightness(1.08)}
+  .btn:focus-visible,.card:focus-visible,.pill:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:1rem;overflow:hidden;box-shadow:var(--shadow);cursor:pointer;text-align:left;display:flex;flex-direction:column;transition:border-color .15s}
+  .card:hover{border-color:var(--accent)}
+  .poster{aspect-ratio:2/3;background:var(--surface2);position:relative;overflow:hidden}
+  .poster img{width:100%;height:100%;object-fit:cover;display:block}
+  .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:1rem;text-align:center;
+      background:linear-gradient(160deg,var(--surface2),var(--surface));}
+  .ph span{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:1.05rem;line-height:1.2;color:var(--muted)}
+  dialog{background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:1.25rem;padding:0;max-width:760px;width:calc(100% - 2rem);max-height:90vh;overflow:auto}
+  dialog::backdrop{background:rgba(5,8,14,.7)}
+  .pill{background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:.25rem .8rem;font-size:.8rem}
+  @media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body class="min-h-screen">
+
+<header class="max-w-7xl mx-auto px-4 pt-10 pb-6">
+  <h1 class="display text-4xl sm:text-5xl font-extrabold">My Film Shelf</h1>
+  <p id="count" class="muted mt-2 text-sm">Loading your collection…</p>
+
+  <div class="mt-6 relative">
+    <svg class="absolute left-4 top-1/2 -translate-y-1/2 muted" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="search" type="search" autocomplete="off" placeholder="Search title, content, actor, actress or director"
+      class="field w-full pl-12 pr-4 py-4 text-base shadow-sm" aria-label="Search the collection">
+  </div>
+
+  <div class="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <select id="f-genre" class="field px-3 py-2.5 text-sm" aria-label="Genre"></select>
+    <select id="f-language" class="field px-3 py-2.5 text-sm" aria-label="Language"></select>
+    <select id="f-format" class="field px-3 py-2.5 text-sm" aria-label="Format"></select>
+    <select id="f-decade" class="field px-3 py-2.5 text-sm" aria-label="Decade"></select>
+  </div>
+  <div id="active" class="mt-3 flex flex-wrap gap-2"></div>
+</header>
+
+<main class="max-w-7xl mx-auto px-4 pb-16">
+  <div id="msg" class="muted text-center py-16 hidden"></div>
+  <div id="grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"></div>
+</main>
+
+<dialog id="dlg" aria-label="Movie details"></dialog>
+
+<script>
+// ---------- CONFIG ----------
+// Published CSV of your public-only tab.
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR7cMMv25DjG0aUigMrB_SUp-j5EBrq-uPpHoUtYIgo23MEf7v7LZy9ihPeAnVT82O4YEi-1i7QljNI/pub?gid=1983191922&single=true&output=csv";
+
+// Only these columns are ever read. Any other column in the sheet is ignored.
+const PUBLIC = ["Title","Disk Name","Status","Content","Format","Disk Feature","Language","Year of Release",
+  "Lead Actor","Lead Actress","Director","Music Director","Genre","Runtime","TMDB Link","Poster Link","Decade"];
+const norm = s => String(s||"").trim().toLowerCase().replace(/\s+/g," ");
+const PUB_KEYS = Object.fromEntries(PUBLIC.map(c => [norm(c), c]));
+
+// ---------- CSV parsing ----------
+function parseCSV(text){
+  const rows=[]; let row=[], cell="", q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){
+      if(c==='"'){ if(text[i+1]==='"'){cell+='"';i++} else q=false }
+      else cell+=c;
+    } else if(c==='"') q=true;
+    else if(c===','){row.push(cell);cell=""}
+    else if(c==='\n'||c==='\r'){ if(c==='\r'&&text[i+1]==='\n')i++; row.push(cell);cell=""; rows.push(row);row=[] }
+    else cell+=c;
+  }
+  if(cell!==""||row.length){row.push(cell);rows.push(row)}
+  return rows;
+}
+
+// ---------- State ----------
+let MOVIES=[];
+const $=id=>document.getElementById(id);
+const filters={genre:"",language:"",format:"",decade:""};
+const splitMulti = v => String(v||"").split(/[,/|;]+/).map(s=>s.trim()).filter(Boolean);
+const decadeOf = m => {
+  if(m["Decade"]) return m["Decade"];
+  const y=parseInt(m["Year of Release"],10);
+  return y ? Math.floor(y/10)*10+"s" : "";
+};
+
+function buildMovies(rows){
+  const header=rows[0].map(norm);
+  const idx=header.map(h=>PUB_KEYS[h]||null); // null = not a public column, dropped here
+  return rows.slice(1).map(r=>{
+    const m={}; idx.forEach((name,i)=>{ if(name) m[name]=(r[i]||"").trim() });
+    m["Decade"]=decadeOf(m);
+    m._search=norm([m["Title"],m["Content"],m["Lead Actor"],m["Lead Actress"],m["Director"]].join(" "));
+    return m;
+  }).filter(m=>m["Title"]);
+}
+
+// ---------- UI ----------
+function fillSelect(id,label,values){
+  const el=$(id), cur=el.value;
+  el.innerHTML="";
+  el.add(new Option("All "+label,""));
+  values.forEach(v=>el.add(new Option(v,v)));
+  el.value=values.includes(cur)?cur:"";
+}
+function setupFilters(){
+  const uniq=fn=>[...new Set(MOVIES.flatMap(fn))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
+  fillSelect("f-genre","genres",uniq(m=>splitMulti(m["Genre"])));
+  fillSelect("f-language","languages",uniq(m=>splitMulti(m["Language"])));
+  fillSelect("f-format","formats",uniq(m=>splitMulti(m["Format"])));
+  const decs=uniq(m=>[m["Decade"]]).sort((a,b)=>parseInt(b)-parseInt(a));
+  fillSelect("f-decade","decades",decs);
+}
+function el(tag,cls,text){const e=document.createElement(tag); if(cls)e.className=cls; if(text!=null)e.textContent=text; return e}
+
+function posterEl(m){
+  const box=el("div","poster");
+  const ph=()=>{ box.innerHTML=""; const p=el("div","ph"); p.append(el("span",null,m["Title"])); box.append(p) };
+  const url=m["Poster Link"];
+  if(!/^https?:\/\//i.test(url||"")){ ph(); return box }
+  const img=new Image();
+  img.alt=m["Title"]+" poster"; img.loading="lazy"; img.referrerPolicy="no-referrer";
+  img.onerror=ph; img.src=url; box.append(img);
+  return box;
+}
+
+function cardEl(m){
+  const b=el("button","card");
+  b.type="button"; b.setAttribute("aria-label","Details for "+m["Title"]);
+  b.append(posterEl(m));
+  const body=el("div","p-3 flex flex-col gap-1.5 flex-1");
+  body.append(el("h3","display font-bold text-[15px] leading-tight",m["Title"]));
+  const sub=[m["Year of Release"],m["Runtime"]].filter(Boolean).join(", ");
+  if(sub) body.append(el("p","muted text-xs",sub));
+  const chips=el("div","flex flex-wrap gap-1 mt-auto pt-1");
+  if(m["Format"]) chips.append(el("span","chip accent",m["Format"]));
+  if(m["Language"]) chips.append(el("span","chip",m["Language"]));
+  body.append(chips); b.append(body);
+  b.onclick=()=>openDetail(m);
+  return b;
+}
+
+function openDetail(m){
+  const d=$("dlg"); d.innerHTML="";
+  const wrap=el("div","grid sm:grid-cols-[220px_1fr] gap-0");
+  const pw=el("div","p-4 sm:p-5"); const p=posterEl(m); p.style.borderRadius=".75rem"; pw.append(p);
+  const info=el("div","p-5 sm:pl-1 flex flex-col gap-3");
+  const head=el("div","flex items-start justify-between gap-3");
+  head.append(el("h2","display text-2xl font-extrabold leading-tight",m["Title"]));
+  const x=el("button","pill","Close"); x.type="button"; x.onclick=()=>d.close(); head.append(x);
+  info.append(head);
+  const sub=[m["Year of Release"],m["Runtime"],m["Language"]].filter(Boolean).join(", ");
+  if(sub) info.append(el("p","muted text-sm",sub));
+  const g=splitMulti(m["Genre"]);
+  if(g.length){const c=el("div","flex flex-wrap gap-1.5"); g.forEach(t=>c.append(el("span","chip",t))); info.append(c)}
+  const rows=[["Lead actor","Lead Actor"],["Lead actress","Lead Actress"],["Director","Director"],["Music director","Music Director"],
+    ["Content","Content"],["Disk name","Disk Name"],["Format","Format"],["Disk features","Disk Feature"],["Status","Status"],["Decade","Decade"]];
+  const dl=el("dl","grid grid-cols-[110px_1fr] gap-x-3 gap-y-2 text-sm");
+  rows.forEach(([lab,key])=>{ if(m[key]){ dl.append(el("dt","muted",lab)); dl.append(el("dd",null,m[key])) } });
+  info.append(dl);
+  if(/^https?:\/\//i.test(m["TMDB Link"]||"")){
+    const a=el("a","btn self-start mt-1","View on TMDB");
+    a.href=m["TMDB Link"]; a.target="_blank"; a.rel="noopener noreferrer"; info.append(a);
+  }
+  wrap.append(pw,info); d.append(wrap); d.showModal();
+}
+$("dlg").addEventListener("click",e=>{ if(e.target===$("dlg")) $("dlg").close() });
+
+function render(){
+  const q=norm($("search").value);
+  const list=MOVIES.filter(m=>
+    (!q || m._search.includes(q)) &&
+    (!filters.genre || splitMulti(m["Genre"]).includes(filters.genre)) &&
+    (!filters.language || splitMulti(m["Language"]).includes(filters.language)) &&
+    (!filters.format || splitMulti(m["Format"]).includes(filters.format)) &&
+    (!filters.decade || m["Decade"]===filters.decade)
+  ).sort((a,b)=>a["Title"].localeCompare(b["Title"]));
+
+  const grid=$("grid"); grid.innerHTML="";
+  const frag=document.createDocumentFragment(); list.forEach(m=>frag.append(cardEl(m))); grid.append(frag);
+
+  $("count").textContent = list.length===MOVIES.length
+    ? MOVIES.length+" titles in the collection"
+    : list.length+" of "+MOVIES.length+" titles";
+  const msg=$("msg");
+  msg.classList.toggle("hidden",list.length>0);
+  msg.textContent = list.length ? "" : "No titles match. Try a different search or clear a filter.";
+
+  const act=$("active"); act.innerHTML="";
+  Object.entries(filters).forEach(([k,v])=>{
+    if(!v) return;
+    const b=el("button","pill",k[0].toUpperCase()+k.slice(1)+": "+v+"  ×"); b.type="button";
+    b.setAttribute("aria-label","Remove "+k+" filter "+v);
+    b.onclick=()=>{filters[k]=""; $("f-"+k).value=""; render()}; act.append(b);
+  });
+}
+
+["genre","language","format","decade"].forEach(k=>$("f-"+k).addEventListener("change",e=>{filters[k]=e.target.value;render()}));
+$("search").addEventListener("input",render);
+
+// ---------- Load ----------
+async function load(){
+  try{
+    const res=await fetch(CSV_URL);
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    const rows=parseCSV(await res.text());
+    if(rows.length<2) throw new Error("The sheet has no data rows.");
+    MOVIES=buildMovies(rows);
+    if(!MOVIES.length) throw new Error("No rows with a Title were found. Check that the header names match.");
+    setupFilters(); render();
+  }catch(err){
+    $("count").textContent="Couldn't load the collection.";
+    const msg=$("msg"); msg.classList.remove("hidden");
+    msg.textContent="The sheet couldn't be read ("+err.message+"). Check that the Public tab is still published as CSV, then reload.";
+  }
+}
+load();
+</script>
+</body>
+</html>
