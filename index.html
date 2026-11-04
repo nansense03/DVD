@@ -77,7 +77,7 @@
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR7cMMv25DjG0aUigMrB_SUp-j5EBrq-uPpHoUtYIgo23MEf7v7LZy9ihPeAnVT82O4YEi-1i7QljNI/pub?gid=1983191922&single=true&output=csv";
 
 // Only these columns are ever read. Any other column in the sheet is ignored.
-const PUBLIC = ["Title","Disk Name","Status","Content","Format","Disk Feature","Language","Year of Release",
+const PUBLIC = ["Title","Disk Name","Watch Status","Media Type","Format","Disk Feature","Language","Year of Release",
   "Lead Actor","Lead Actress","Director","Music Director","Genre","Runtime","TMDB Link","Poster Link","Decade"];
 const norm = s => String(s||"").trim().toLowerCase().replace(/\s+/g," ");
 const PUB_KEYS = Object.fromEntries(PUBLIC.map(c => [norm(c), c]));
@@ -116,7 +116,8 @@ function buildMovies(rows){
   return rows.slice(1).map(r=>{
     const m={}; idx.forEach((name,i)=>{ if(name) m[name]=(r[i]||"").trim() });
     m["Decade"]=decadeOf(m);
-    m._search=norm([m["Title"],m["Content"],m["Lead Actor"],m["Lead Actress"],m["Director"]].join(" "));
+    m["Runtime"]=(v=>/^\d+$/.test(v)?v+" mins":v.replace(/\s*mins?\.?$/i," mins"))(m["Runtime"]);
+    m._search=norm([m["Title"],m["Media Type"],m["Lead Actor"],m["Lead Actress"],m["Director"]].join(" "));
     return m;
   }).filter(m=>m["Title"]);
 }
@@ -180,7 +181,7 @@ function openDetail(m){
   const g=splitMulti(m["Genre"]);
   if(g.length){const c=el("div","flex flex-wrap gap-1.5"); g.forEach(t=>c.append(el("span","chip",t))); info.append(c)}
   const rows=[["Lead actor","Lead Actor"],["Lead actress","Lead Actress"],["Director","Director"],["Music director","Music Director"],
-    ["Content","Content"],["Disk name","Disk Name"],["Format","Format"],["Disk features","Disk Feature"],["Status","Status"],["Decade","Decade"]];
+    ["Media type","Media Type"],["Disk name","Disk Name"],["Format","Format"],["Disk features","Disk Feature"],["Watch Status","Watch Status"],["Decade","Decade"]];
   const dl=el("dl","grid grid-cols-[110px_1fr] gap-x-3 gap-y-2 text-sm");
   rows.forEach(([lab,key])=>{ if(m[key]){ dl.append(el("dt","muted",lab)); dl.append(el("dd",null,m[key])) } });
   info.append(dl);
