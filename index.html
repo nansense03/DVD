@@ -56,11 +56,12 @@
       class="field w-full pl-12 pr-4 py-4 text-base shadow-sm" aria-label="Search the collection">
   </div>
 
-  <div class="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+  <div class="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
     <select id="f-genre" class="field px-3 py-2.5 text-sm" aria-label="Genre"></select>
     <select id="f-language" class="field px-3 py-2.5 text-sm" aria-label="Language"></select>
     <select id="f-format" class="field px-3 py-2.5 text-sm" aria-label="Format"></select>
     <select id="f-decade" class="field px-3 py-2.5 text-sm" aria-label="Decade"></select>
+     <select id="f-media" class="field px-3 py-2.5 text-sm" aria-label="Media Type"></select>
   </div>
   <div id="active" class="mt-3 flex flex-wrap gap-2"></div>
 </header>
@@ -150,7 +151,7 @@ function parseCSV(text){
 // ---------- State ----------
 let MOVIES=[];
 const $=id=>document.getElementById(id);
-const filters={genre:"",language:"",format:"",decade:""};
+const filters={genre:"",language:"",format:"",decade:"",media:""};
 const splitMulti = v => String(v||"").split(/[,/|;]+/).map(s=>s.trim()).filter(Boolean);
 const decadeOf = m => {
   if(m["Decade"]) return m["Decade"];
@@ -183,6 +184,7 @@ function setupFilters(){
   fillSelect("f-genre","genres",uniq(m=>splitMulti(m["Genre"])));
   fillSelect("f-language","languages",uniq(m=>splitMulti(m["Language"])));
   fillSelect("f-format","formats",uniq(m=>splitMulti(m["Format"])));
+    fillSelect("f-media","media types",uniq(m=>[m["Media Type"]]));
   const decs=uniq(m=>[m["Decade"]]).sort((a,b)=>parseInt(b)-parseInt(a));
   fillSelect("f-decade","decades",decs);
 }
@@ -248,7 +250,8 @@ function render(){
     (!filters.genre || splitMulti(m["Genre"]).includes(filters.genre)) &&
     (!filters.language || splitMulti(m["Language"]).includes(filters.language)) &&
     (!filters.format || splitMulti(m["Format"]).includes(filters.format)) &&
-    (!filters.decade || m["Decade"]===filters.decade)
+        (!filters.decade || m["Decade"]===filters.decade) &&
+    (!filters.media || m["Media Type"]===filters.media)
   ).sort((a,b)=>a["Title"].localeCompare(b["Title"]));
 
   const grid=$("grid"); grid.innerHTML="";
@@ -270,7 +273,7 @@ function render(){
   });
 }
 
-["genre","language","format","decade"].forEach(k=>$("f-"+k).addEventListener("change",e=>{filters[k]=e.target.value;render()}));
+["genre","language","format","decade","media"].forEach(k=>$("f-"+k).addEventListener("change",e=>{filters[k]=e.target.value;render()}));
 $("search").addEventListener("input",render);
 $("about-btn").onclick=()=>$("about").showModal();
 $("about-close").onclick=()=>$("about").close();
